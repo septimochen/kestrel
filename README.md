@@ -55,7 +55,8 @@ a correct chess engine. Capture restoration can also corrupt the board during tr
 
 - [Architecture and API](docs/architecture.md): source map, board layout, data flow, and API contracts.
 - [Development guide](docs/development.md): commands, tests, debugging, and contribution workflow.
-- [Roadmap](docs/roadmap.md): milestones and their correctness gates.
+- [Roadmap](docs/roadmap.md): actionable checklists, C++/chess learning goals, and correctness gates.
+- [Design review](docs/design-review.md): design improvements and implementation tradeoffs.
 - [AGENTS.md](AGENTS.md): detailed project design and coding rules.
 
 The immediate next milestone is complete make/undo restoration, followed by

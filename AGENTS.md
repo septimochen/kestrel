@@ -1,1628 +1,224 @@
-# Kestrel — AGENTS.md
+# Kestrel — contributor and agent instructions
 
-## Project Overview
+## Purpose and priorities
 
-Kestrel is a C++ chess engine
+Kestrel is a chess engine and a practical course in modern C++ and chess.
+Prioritize correctness, readability, testability, and incremental complexity,
+then measure performance before optimizing. Preserve deterministic results for
+fixed positions, search limits, and configuration.
 
-Kestrel should prioritize **correctness, readability, testability, and incremental complexity** before optimization.
+Use C++20, CMake 3.20+, Clang or GCC, and the standard library. No external
+runtime or test library is required initially. Do not raise the language standard
+silently; `std::expected` is C++23 and is not available under this baseline.
 
-The engine should eventually progress from a simple educational implementation to a reasonably strong high-performance chess engine.
+## Workflow
 
----
+- Read [README.md](README.md) for current behavior and
+  [docs/roadmap.md](docs/roadmap.md) for the actionable plan. Roadmap checkboxes
+  are the single source of milestone status; this file records durable rules.
+- Keep a root Makefile for common build, check, run, Perft, and format commands.
+- Keep `.gitignore` in allowlist form. Explicitly allow new project inputs and
+  leave generated outputs ignored.
+- Implement one coherent learning step per change. Update affected docs and
+  checkboxes only when implementation and validation support completion.
+- Run appropriate checks, report existing failures accurately, and distinguish
+  them from regressions. Never claim a milestone is complete because it compiles.
+- Always commit completed tasks with a descriptive message and push when a Git
+  remote exists. Stage only files belonging to the task.
+- If auxiliary Python tooling is introduced, manage it with uv and add Ruff, ty,
+  and pytest as development dependencies; do not add Python to the engine core.
 
-## Technology
-
-- Language: Modern C++
-- Build system: CMake
-- Testing: CTest / executable-based tests
-- Primary platform: macOS
-- Compiler: Clang or GCC
-- Standard library: C++ standard library
-- No external dependencies should be required initially.
-
-Build:
-
-```bash
-cmake -S . -B build
-cmake --build build
+```sh
+make check
+make run
+make perft DEPTH=3
 ```
 
-Run tests:
+Direct build equivalent:
 
-```bash
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Run the engine:
-
-```bash
-./build/kestrel
-```
-
-Run Perft:
-
-```bash
-./build/kestrel perft 1
-./build/kestrel perft 2
-./build/kestrel perft 3
-```
-
----
-
-# Architecture
-
-The engine should evolve around these major components:
-
-```text
-                         Kestrel
-                            │
-              ┌─────────────┴─────────────┐
-              │                           │
-           Position                      Move
-              │                           │
-              └─────────────┬─────────────┘
-                            │
-                            ▼
-                       Move Generation
-                            │
-                            ▼
-                       Make / Undo
-                            │
-                            ▼
-                           Perft
-                            │
-                            ▼
-                          Search
-                            │
-              ┌─────────────┼──────────────┐
-              ▼             ▼              ▼
-          Evaluation    Move Ordering   Hashing
-              │             │              │
-              └─────────────┼──────────────┘
-                            ▼
-                    Transposition Table
-                            │
-                            ▼
-                          UCI
-```
-
-Eventually:
-
-```text
-Board
-  ↓
-Move Generation
-  ↓
-Make / Undo
-  ↓
-Search
-  ├── Negamax
-  ├── Alpha-Beta
-  ├── Iterative Deepening
-  ├── Quiescence Search
-  ├── Move Ordering
-  └── Transposition Table
-  ↓
-Evaluation
-  ├── Classical evaluation
-  └── NNUE
-  ↓
-UCI
-```
-
----
-
-# Current Project Structure
-
-The initial project should use:
-
-```text
-kestrel/
-├── CMakeLists.txt
-├── README.md
-├── AGENTS.md
-├── LICENSE
-│
-├── include/
-│   └── kestrel/
-│       ├── types.hpp
-│       ├── board.hpp
-│       ├── move.hpp
-│       ├── movegen.hpp
-│       ├── perft.hpp
-│       └── search.hpp
-│
-├── src/
-│   ├── main.cpp
-│   ├── board.cpp
-│   ├── move.cpp
-│   ├── movegen.cpp
-│   ├── perft.cpp
-│   └── search.cpp
-│
-└── tests/
-    └── perft_tests.cpp
-```
-
-As the engine grows, additional modules may be introduced:
-
-```text
-evaluation.hpp/cpp
-search.hpp/cpp
-zobrist.hpp/cpp
-transposition_table.hpp/cpp
-uci.hpp/cpp
-bitboard.hpp/cpp
-attacks.hpp/cpp
-```
-
-Do not create abstractions prematurely.
-
----
-
-# Development Principles
-
-## 1. Correctness before performance
-
-The first implementation should be easy to understand.
-
-Do not immediately optimize using:
-
-- bitboards
-- SIMD
-- complicated templates
-- custom allocators
-- lock-free data structures
-- assembly
-- advanced search heuristics
-
-First make the engine correct.
-
-Optimization comes after profiling.
-
----
-
-## 2. Keep the engine deterministic
-
-Given:
-
-```text
-same position
-same search parameters
-same engine configuration
-```
-
-the engine should produce the same result unless nondeterminism is intentionally introduced.
-
-Avoid unnecessary global state.
-
----
-
-## 3. Test every major subsystem
-
-Important components must have tests.
-
-Especially:
-
-- FEN parsing
-- board representation
-- move generation
-- make/undo
-- attack detection
-- check detection
-- castling
-- en passant
-- promotion
-- Perft
-- search
-- hashing
-
-Chess engines are particularly sensitive to tiny state-management bugs.
-
----
-
-# Chess Board Representation
-
-## Initial implementation
-
-Use a simple 64-square array.
-
-```cpp
-std::array<Piece, 64>
-```
-
-Square mapping:
-
-```text
-8  56 57 58 59 60 61 62 63
-7  48 49 50 51 52 53 54 55
-6  40 41 42 43 44 45 46 47
-5  32 33 34 35 36 37 38 39
-4  24 25 26 27 28 29 30 31
-3  16 17 18 19 20 21 22 23
-2   8  9 10 11 12 13 14 15
-1   0  1  2  3  4  5  6  7
-    a  b  c  d  e  f  g  h
-```
-
-Therefore:
-
-```cpp
-a1 == 0
-b1 == 1
-...
-h1 == 7
-
-a8 == 56
-...
-h8 == 63
-```
-
-Helper functions:
-
-```cpp
-constexpr Square makeSquare(int file, int rank) {
-    return static_cast<Square>(rank * 8 + file);
-}
-
-constexpr int fileOf(Square square) {
-    return square % 8;
-}
-
-constexpr int rankOf(Square square) {
-    return square / 8;
-}
-```
-
----
-
-# Pieces
-
-Use strongly typed enums:
-
-```cpp
-enum class Color : uint8_t {
-    White,
-    Black
-};
-
-enum class PieceType : uint8_t {
-    None,
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King
-};
-```
-
-A piece initially consists of:
-
-```cpp
-struct Piece {
-    PieceType type = PieceType::None;
-    Color color = Color::White;
-
-    constexpr bool empty() const {
-        return type == PieceType::None;
-    }
-};
-```
-
-Do not encode pieces into complicated integers until there is a demonstrated need.
-
----
-
-# Move Representation
-
-The initial representation should prioritize readability:
-
-```cpp
-struct Move {
-    Square from = 0;
-    Square to = 0;
-
-    PieceType promotion = PieceType::None;
-
-    bool isCapture = false;
-    bool isEnPassant = false;
-    bool isCastling = false;
-};
-```
-
-Eventually this can become a compact integer representation.
-
-Possible future representation:
-
-```text
-bits:
-from square
-to square
-promotion
-special move flags
-```
-
-But this should only happen after the basic engine is correct.
-
----
-
-# Board State
-
-The board must track at least:
-
-```text
-pieces
-side to move
-castling rights
-en passant square
-```
-
-Later it should also track:
-
-```text
-halfmove clock
-fullmove number
-Zobrist hash
-```
-
-A make/undo operation should preserve all reversible state.
-
-The target API is:
-
-```cpp
-BoardState state = board.makeMove(move);
-
-...
-
-board.undoMove(move, state);
-```
-
-The state object should eventually contain enough information to restore the board **exactly**.
-
-This includes captured pieces.
-
-Never rely on reconstructing state heuristically during undo.
-
----
-
-# FEN
-
-Kestrel should support FEN input.
-
-Starting position:
-
-```text
-rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-```
-
-The FEN parser should eventually support all six fields:
-
-```text
-1. piece placement
-2. side to move
-3. castling availability
-4. en passant target square
-5. halfmove clock
-6. fullmove number
-```
-
-Malformed FEN should be rejected.
-
----
-
-# Move Generation
-
-Move generation should be implemented incrementally.
-
-Recommended order:
-
-```text
-1. Pawn
-2. Knight
-3. Bishop
-4. Rook
-5. Queen
-6. King
-7. Captures
-8. Promotion
-9. En passant
-10. Castling
-11. Check detection
-12. Legal move filtering
-```
-
-Separate:
-
-```text
-pseudo-legal moves
-```
-
-from:
-
-```text
-legal moves
-```
-
-Pseudo-legal moves satisfy movement rules but may leave the king in check.
-
-Legal moves must never leave the moving side's king in check.
-
----
-
-# Pawn Rules
-
-Pawns require special handling.
-
-White moves toward increasing ranks.
-
-Black moves toward decreasing ranks.
-
-Support:
-
-```text
-single push
-double push
-diagonal capture
-promotion
-en passant
-```
-
-Promotion choices:
-
-```text
-Queen
-Rook
-Bishop
-Knight
-```
-
-There is no promotion to king or pawn.
-
----
-
-# Sliding Pieces
-
-Bishop directions:
-
-```text
-(+1,+1)
-(+1,-1)
-(-1,+1)
-(-1,-1)
-```
-
-Rook directions:
-
-```text
-(+1,0)
-(-1,0)
-(0,+1)
-(0,-1)
-```
-
-Queen uses both.
-
-Sliding generation must stop at the first occupied square.
-
-If that square contains an enemy piece, it may be captured.
-
-If it contains a friendly piece, movement stops without adding the square.
-
----
-
-# King
-
-The king moves one square in any direction.
-
-Legal king movement must eventually check whether the destination square is attacked.
-
-Castling requires:
-
-```text
-king has not moved
-rook has not moved
-squares between king and rook are empty
-king is not currently in check
-king does not cross an attacked square
-king does not end on an attacked square
-```
-
----
-
-# Attack Detection
-
-Implement a dedicated attack detector.
-
-Conceptually:
-
-```cpp
-bool isSquareAttacked(
-    const Board& board,
-    Square square,
-    Color byColor
-);
-```
-
-This function is fundamental.
-
-It should detect attacks from:
-
-```text
-pawns
-knights
-bishops
-rooks
-queens
-king
-```
-
-Once implemented, it should be reused for:
-
-```text
-check detection
-legal move filtering
-king movement
-castling
-```
-
-Avoid duplicating attack logic in multiple places.
-
----
-
-# Check Detection
-
-Implement:
-
-```cpp
-bool isInCheck(
-    const Board& board,
-    Color color
-);
-```
-
-A position is illegal if the side to move's king is attacked.
-
-Legal move generation can initially be implemented as:
-
-```text
-generate pseudo-legal moves
-        ↓
-make move
-        ↓
-if own king is not in check
-        ↓
-keep move
-        ↓
-undo move
-```
-
-This is not necessarily the fastest approach, but it is easy to verify.
-
-Optimize only later.
-
----
-
-# Perft
-
-Perft is one of the most important components of Kestrel.
-
-It counts the number of leaf nodes reachable at a given depth.
-
-Basic implementation:
-
-```cpp
-uint64_t perft(Board& board, int depth) {
-    if (depth == 0)
-        return 1;
-
-    uint64_t nodes = 0;
-
-    auto moves = generateLegalMoves(board);
-
-    for (const Move& move : moves) {
-        auto state = board.makeMove(move);
-        nodes += perft(board, depth - 1);
-        board.undoMove(move, state);
-    }
-
-    return nodes;
-}
-```
-
-Starting position expected results:
-
-```text
-depth 1 = 20
-depth 2 = 400
-depth 3 = 8902
-depth 4 = 197281
-```
-
-More depths should be added as the implementation becomes correct.
-
-Perft must be correct before serious search development begins.
-
----
-
-# Perft Debugging
-
-A useful future feature is:
-
-```text
-perft divide
-```
-
-Instead of:
-
-```text
-depth 3 = 8902
-```
-
-produce:
-
-```text
-a2a3 380
-a2a4 420
-b2b3 420
-...
-```
-
-This makes it possible to identify exactly which move produces an incorrect subtree.
-
----
-
-# Search
-
-The initial search should use negamax.
-
-Conceptually:
-
-```text
-search(position)
-    |
-    +-- generate legal moves
-    |
-    +-- make move
-    |
-    +-- search child position
-    |
-    +-- undo move
-    |
-    +-- choose best score
-```
-
-Eventually:
-
-```cpp
-int negamax(
-    Board& board,
-    int depth,
-    int alpha,
-    int beta
-);
-```
-
-Use the side-to-move perspective:
-
-```text
-score(position) =
-    max(-score(child))
-```
-
-This makes the implementation considerably simpler than maintaining separate maximizing/minimizing code.
-
----
-
-# Alpha-Beta
-
-After basic negamax, implement alpha-beta pruning.
-
-Conceptually:
-
-```cpp
-int negamax(
-    Board& board,
-    int depth,
-    int alpha,
-    int beta
-) {
-    if (depth == 0)
-        return evaluate(board);
-
-    int best = -INF;
-
-    for (const Move& move : generateLegalMoves(board)) {
-        auto state = board.makeMove(move);
-
-        int score = -negamax(
-            board,
-            depth - 1,
-            -beta,
-            -alpha
-        );
-
-        board.undoMove(move, state);
-
-        best = std::max(best, score);
-        alpha = std::max(alpha, score);
-
-        if (alpha >= beta)
-            break;
-    }
-
-    return best;
-}
-```
-
-Alpha-beta should be introduced only after basic negamax works.
-
----
-
-# Evaluation
-
-Start extremely simple.
-
-Material values:
-
-```text
-Pawn   = 100
-Knight = 320
-Bishop = 330
-Rook   = 500
-Queen  = 900
-King   = very large / handled separately
-```
-
-Evaluation should be from White's perspective or, preferably, consistently from the side-to-move perspective depending on the search design.
-
-Eventually add:
-
-```text
-material
-piece-square tables
-mobility
-king safety
-pawn structure
-passed pawns
-isolated pawns
-doubled pawns
-bishop pair
-rook activity
-space
-tempo
-```
-
-Do not implement NNUE until the classical engine is already working.
-
----
-
-# Iterative Deepening
-
-Search progressively:
-
-```text
-depth 1
-depth 2
-depth 3
-depth 4
-...
-```
-
-Advantages:
-
-- always have a move available
-- improves move ordering
-- works naturally with time controls
-- provides predictable search behavior
-
-The engine should eventually support a search deadline.
-
----
-
-# Quiescence Search
-
-A normal fixed-depth search can stop during a tactical sequence.
-
-Example:
-
-```text
-Queen captures piece
-    ↓
-depth reaches zero
-    ↓
-evaluation happens immediately
-```
-
-This can produce severe horizon effects.
-
-Quiescence search should extend tactical positions using moves such as:
-
-```text
-captures
-promotions
-possibly checks
-```
-
-The first implementation can search captures only.
-
----
-
-# Move Ordering
-
-Move ordering is critical for alpha-beta performance.
-
-Eventually prioritize:
-
-```text
-1. Transposition-table / hash move
-2. Winning captures
-3. Promotions
-4. Killer moves
-5. History heuristic
-6. Quiet moves
-```
-
-Good move ordering can drastically reduce the number of searched nodes.
-
----
-
-# Zobrist Hashing
-
-Each chess position should eventually have a 64-bit Zobrist hash.
-
-Generate random keys for combinations such as:
-
-```text
-piece × color × square
-side to move
-castling rights
-en passant file
-```
-
-Then a position can be represented by:
-
-```cpp
-uint64_t hash;
-```
-
-The hash must change incrementally when making/undoing moves.
-
----
-
-# Transposition Table
-
-Different move sequences can lead to the same chess position.
-
-Example:
-
-```text
-A → B → C
-
-A → C → B
-```
-
-may result in the same position.
-
-Store previously searched positions:
-
-```text
-hash
-depth
-score
-bound
-best move
-```
-
-A future entry might look like:
-
-```cpp
-struct TTEntry {
-    uint64_t key;
-    int depth;
-    int score;
-    Move bestMove;
-    Bound bound;
-};
-```
-
-The transposition table should be implemented only after Zobrist hashing works.
-
----
-
-# Bitboards
-
-Once the array-based implementation is correct, introduce bitboards.
-
-A bitboard is:
-
-```cpp
-using Bitboard = uint64_t;
-```
-
-Each bit corresponds to one square.
-
-Eventually the position can contain:
-
-```cpp
-Bitboard whitePieces;
-Bitboard blackPieces;
-
-Bitboard pawns;
-Bitboard knights;
-Bitboard bishops;
-Bitboard rooks;
-Bitboard queens;
-Bitboard kings;
-```
-
-Bitboards enable extremely efficient operations using:
-
-```text
-&
-|
-^
-~
-<<
->>
-popcount
-bit scans
-```
-
-This is an important Kestrel learning milestone.
-
-Do not replace the simple board representation before Perft is correct.
-
----
-
-# Performance Engineering
-
-Performance work should follow:
-
-```text
-correctness
-    ↓
-benchmark
-    ↓
-profile
-    ↓
-identify bottleneck
-    ↓
-optimize
-    ↓
-benchmark again
-```
-
-Do not optimize based purely on intuition.
-
-Important metrics:
-
-```text
-nodes searched
-nodes/second
-search depth
-branching factor
-transposition-table hit rate
-cutoff rate
-move-generation time
-evaluation time
-```
-
-Perft is especially useful as a move-generation benchmark.
-
----
-
-# UCI
-
-Eventually Kestrel should implement the Universal Chess Interface.
-
-Important commands include:
-
-```text
-uci
-isready
-ucinewgame
-position
-go
-stop
-quit
-```
-
-Example:
-
-```text
-position startpos
-go depth 10
-```
-
-Response:
-
-```text
-bestmove e2e4
-```
-
-The UCI layer should be separate from the chess engine core.
-
-Architecture:
-
-```text
-UCI
- │
- ▼
-Engine API
- │
- ├── Board
- ├── MoveGen
- ├── Search
- └── Evaluation
-```
-
-The engine should not depend on a GUI.
-
----
-
-# Future Advanced Features
-
-After the classical engine is strong enough, investigate:
-
-```text
-Opening book
-Syzygy tablebases
-Parallel search
-Lazy SMP
-NNUE
-SIMD
-Advanced bitboard attacks
-Magic bitboards
-CPU-specific optimization
-```
-
-These are later milestones.
-
-Do not introduce them prematurely.
-
----
-
-# Suggested Complete Roadmap
-
-## Stage 0 — Bootstrap
-
-Current:
-
-```text
-CMake
-C++20
-project structure
-basic Board
-Piece
-Move
-FEN
-pseudo-legal moves
-Perft skeleton
-tests
-```
-
----
-
-## Stage 1 — Correct Board State
-
-Implement:
-
-```text
-complete makeMove
-complete undoMove
-captured piece restoration
-castling state
-en passant state
-halfmove clock
-fullmove number
-```
-
-Every make/undo pair must restore the exact original position.
-
----
-
-## Stage 2 — Legal Move Generation
-
-Implement:
-
-```text
-attack detection
-king location
-check detection
-legal move filtering
-castling
-en passant
-promotion
-```
-
-Then validate using Perft.
-
----
-
-## Stage 3 — Perft Validation
-
-Validate:
-
-```text
-starting position
-castling positions
-en passant positions
-promotion positions
-check positions
-pin positions
-```
-
-Add Perft Divide.
-
-Do not begin serious search until this stage is reliable.
-
----
-
-## Stage 4 — Basic Search
-
-Implement:
-
-```text
-evaluation
-negamax
-alpha-beta
-```
-
-The engine should be able to choose a move.
-
----
-
-## Stage 5 — Search Improvements
-
-Implement in this order:
-
-```text
-iterative deepening
-move ordering
-quiescence search
-killer moves
-history heuristic
-```
-
----
-
-## Stage 6 — Hashing
-
-Implement:
-
-```text
-Zobrist hashing
-transposition table
-hash move ordering
-```
-
----
-
-## Stage 7 — Bitboards
-
-Reimplement board representation using bitboards.
-
-Compare:
-
-```text
-array implementation
-vs
-bitboard implementation
-```
-
-Benchmark both.
-
-The old implementation can be retained as a reference if useful.
-
----
-
-## Stage 8 — UCI
-
-Implement:
-
-```text
-uci
-isready
-ucinewgame
-position
-go depth
-go movetime
-stop
-quit
-bestmove
-```
-
-Then connect Kestrel to a chess GUI.
-
----
-
-## Stage 9 — Stronger Search
-
-Investigate:
-
-```text
-Principal Variation Search
-Null Move Pruning
-Late Move Reductions
-Futility Pruning
-Razoring
-Aspiration Windows
-Static Exchange Evaluation
-```
-
-Only introduce each technique with tests and benchmarks.
-
----
-
-## Stage 10 — Evaluation
-
-Improve evaluation:
-
-```text
-piece-square tables
-mobility
-king safety
-pawn structure
-passed pawns
-rook activity
-bishop pair
-endgame scaling
-```
-
----
-
-## Stage 11 — Advanced Engine
-
-Eventually:
-
-```text
-NNUE
-parallel search
-opening book
-Syzygy tablebases
-advanced bitboard attacks
-```
-
----
-
-# Coding Style
-
-Prefer clear modern C++.
-
-Use:
-
-```cpp
-std::array
-std::vector
-std::string
-std::span
-std::optional
-std::unique_ptr
-constexpr
-enum class
-```
-
-where appropriate.
-
-Prefer RAII.
-
-Avoid:
-
-```text
-raw owning pointers
-global mutable state
-unnecessary macros
-C-style casts
-premature template metaprogramming
-unnecessary inheritance
-```
-
-Prefer composition over inheritance.
-
-Use `const` appropriately.
-
-Use references where ownership is not transferred.
-
-Use `std::unique_ptr` only when dynamic ownership is actually needed.
-
-Do not add abstractions merely to demonstrate a C++ feature.
-
----
-
-# Error Handling
-
-Public parsing functions should communicate failure clearly.
-
-For example:
-
-```cpp
-bool setFromFen(const std::string& fen);
-```
-
-Later, if appropriate, use:
-
-```cpp
-std::expected
-```
-
-or another explicit error mechanism.
-
-Do not silently accept malformed FEN.
-
----
-
-# Naming
-
-Project name:
-
-```text
-Kestrel
-```
-
-Namespace:
-
-```cpp
-namespace kestrel
-```
-
-Executable:
-
-```text
-kestrel
-```
-
-Library:
-
-```text
-kestrel_lib
-```
-
-Use descriptive names.
-
-Examples:
-
-```text
-Board
-Move
-Piece
-Square
-generateLegalMoves
-generatePseudoLegalMoves
-isSquareAttacked
-isInCheck
-makeMove
-undoMove
-perft
-negamax
-evaluate
-```
-
----
-
-# Important Design Rule
-
-Kestrel is a learning project.
-
-When there is a choice between:
-
-```text
-shorter but opaque implementation
-```
-
-and:
-
-```text
-slightly longer but understandable implementation
-```
-
-prefer the understandable implementation during early stages.
-
-After correctness is established, performance-oriented rewrites are encouraged.
-
-This makes the project useful both as a chess engine and as a way to learn C++.
-
----
-
-# Relationship to C++ Learning
-
-Kestrel should be used to practice:
-
-```text
-C++20
-RAII
-references
-const correctness
-structs/classes
-enum class
-STL containers
-algorithms
-templates
-bit manipulation
-recursion
-memory/layout
-benchmarking
-profiling
-multithreading
-atomics
-```
-
-The project should not force a C++ feature into the code when the feature does not naturally belong there.
-
----
-
-# Relationship to Systems Programming
-
-Kestrel should eventually provide hands-on experience with:
-
-```text
-CPU cache behavior
-data-oriented design
-memory layout
-branch prediction
-bit operations
-hash tables
-parallel computation
-profiling
-benchmarking
-serialization
-protocol implementation
-```
-
-The progression should be:
-
-```text
-Readable implementation
-        ↓
-Correct implementation
-        ↓
-Measured implementation
-        ↓
-Optimized implementation
-```
-
----
-
-# Relationship to llama.cpp Learning
-
-Kestrel and llama.cpp can be used as complementary systems-programming projects.
-
-Kestrel emphasizes:
-
-```text
-algorithms
-search
-recursion
-bitboards
-hashing
-heuristics
-game trees
-```
-
-llama.cpp emphasizes:
-
-```text
-tensor computation
-memory management
-SIMD
-quantization
-neural networks
-parallelism
-CPU/GPU execution
-```
-
-Together they provide a broad path toward high-performance C++.
-
----
-
-# What NOT to Do
-
-Do not:
-
-- start by copying Stockfish
-- implement NNUE first
-- implement bitboards before understanding the simple board
-- optimize before profiling
-- skip Perft
-- skip make/undo tests
-- use undefined behavior for speed
-- introduce global state unnecessarily
-- make the UCI layer responsible for chess logic
-- mix search logic with board representation
-- assume pseudo-legal moves are legal
-- trust a single Perft depth as proof of correctness
-
----
-
-# Definition of Done for a Milestone
-
-A milestone is not complete merely because the code compiles.
-
-A milestone should have:
-
-```text
-implementation
-tests
-correctness validation
-reasonable API
-documentation where necessary
-no known state-corruption bugs
-```
-
-For chess-specific functionality, use known Perft positions whenever possible.
-
----
-
-# Immediate Next Task
-
-The first serious Kestrel task after the bootstrap is:
-
-```text
-Implement complete makeMove/undoMove state restoration.
-```
-
-Then:
-
-```text
-Implement attack detection.
-```
-
-Then:
-
-```text
-Implement legal move generation.
-```
-
-Then:
-
-```text
-Make Perft pass known chess positions.
-```
-
-Only after these are complete should search be implemented.
-
-The immediate target is:
-
-```text
-Board
-  ↓
-Pseudo-legal moves
-  ↓
-Make / Undo
-  ↓
-Attack detection
-  ↓
-Legal moves
-  ↓
-Perft
-  ↓
-Correct chess engine foundation
-```
-
-Once that foundation is correct, Kestrel can evolve into:
-
-```text
-Perft
-  ↓
-Negamax
-  ↓
-Alpha-Beta
-  ↓
-Iterative Deepening
-  ↓
-Quiescence
-  ↓
-Move Ordering
-  ↓
-Zobrist
-  ↓
-Transposition Table
-  ↓
-Bitboards
-  ↓
-UCI
-  ↓
-Advanced Search
-  ↓
-NNUE
-```
+Current tests use `assert`, so Debug is necessary until test checks run under
+`NDEBUG` too. The existing depth-three failure is tracked in the roadmap.
+
+## Learning approach
+
+For each milestone, explain the chess rule, the state invariant, the relevant
+C++ concept, and how a test demonstrates it. Use short examples tied to real
+source files. Let the user experiment with small positions and inspect results.
+Do not introduce a language feature merely to demonstrate it.
+
+Prefer value semantics, `std::array`, `std::vector`, `enum class`, `constexpr`,
+references, and const correctness in the foundation. Practice recursion and
+algorithms in Perft/search, RAII when rollback or resources need lifetime
+management, and bit operations after correctness. Templates, concurrency,
+atomics, SIMD, and custom allocation belong only where a measured need exists.
+
+## Module boundaries
+
+```text
+CLI / future UCI → engine operations
+                      ├── Board + Move
+                      ├── move generation + attack detection
+                      ├── Perft (validation consumer)
+                      └── Search → evaluation + ordering + future TT
+```
+
+Perft and search are separate consumers of the chess core. Search does not
+call Perft; evaluation does not depend on UCI. Keep input/output and protocol
+handling outside board, generation, and search logic. Introduce modules such
+as evaluation, attacks, hashing, and UCI only when their implementations need them.
+Avoid a generic engine framework, inheritance hierarchy, or service layer.
+
+Use namespace `kestrel`, executable `kestrel`, and library `kestrel_lib`.
+Public headers live in `include/kestrel`, implementations in `src`, tests in
+`tests`, and learning/design docs in `docs`.
+
+## Board, moves, and state invariants
+
+Start with `std::array<Piece, 64>`. Square mapping is `rank * 8 + file`, with
+zero-based file/rank: a1 = 0, h1 = 7, a8 = 56, h8 = 63. White pawn movement
+increases ranks. Use strongly typed colors and piece types; an empty piece has
+`PieceType::None` and its color has no meaning.
+
+Document bounds and preconditions. Validate external coordinates before indexing.
+Do arithmetic in `int`, validate bounds, then convert to `Square`; prevent
+unsigned wraparound. Include the standard headers each file directly needs.
+
+Keep the readable `Move` struct initially. Its flags and promotion field must
+be consistent. Kings are never captured. A validated external move should match
+a generated legal move before mutation; internal make can assume a documented
+valid move. A default `Move{}` is not a no-move sentinel: use `std::optional<Move>`
+in a future search result, with score, completed depth, and node count as needed.
+
+The board owns position state: pieces, side to move, castling rights, en passant
+target, halfmove clock, and fullmove number. Add hashes only in the hashing stage.
+Keep game history separate from a single position; repetition needs history,
+not just a current board.
+
+`makeMove` returns a state value consumed by the matching `undoMove`. Save the
+original moving piece, captured piece and its actual square, prior metadata,
+and enough rook state for castling. Never reconstruct captured state heuristically.
+Update castling rights on king/rook movement and capture of a home-square rook.
+A rook returning home does not regain rights. Promotion undo restores a pawn.
+
+Reset the halfmove clock on pawn moves and captures; increment it otherwise.
+Increment the fullmove number after Black moves. Exact undo includes both clocks.
+Every successful traversal, early return, cutoff, or future cancellation must
+restore the entry position. Start with explicit make/undo; add a small RAII
+rollback guard if exit paths become difficult to audit.
+
+## FEN and input handling
+
+Parse all six FEN fields into a temporary position and commit only on success.
+Reject invalid piece symbols, rank widths, side tokens, castling syntax,
+en passant syntax, and invalid counters; reject unwanted trailing input.
+Document structural validation separately from full legal reachability.
+
+Playable positions require one king per color and consistent basic invariants;
+allow deliberately incomplete teaching fixtures only through explicit test setup.
+An en passant target can appear after a double push even when no capture is
+available. Do not reject such FEN simply because no adjacent pawn can capture.
+Define stricter historical-consistency checks explicitly rather than silently.
+
+Keep parsing failure explicit. A bool is adequate initially; add an error enum
+or result struct if useful diagnostics justify it. Mark meaningful return values
+`[[nodiscard]]` when ignoring them would hide an error. Validate CLI depth and
+numeric conversion; reject negative depth and report errors without uncaught
+exceptions. Document a practical depth/resource limit when introducing one.
+
+## Attacks and legal moves
+
+Keep attack detection independent of legal move generation. Pawns attack
+diagonally even when their target is empty; kings attack adjacent squares.
+Pinned pieces still attack squares for king-safety purposes. Use the same
+dedicated detector for check, king destinations, and castling safety.
+
+Being in check is a valid game state. A move is illegal if it leaves the moving
+side's king attacked; the side to move may need to evade an existing check.
+Do not confuse legal check positions with malformed positions.
+
+Generate ordinary pseudo-legal moves, make each candidate, test own king safety,
+and undo. En passant must remove the captured pawn before testing discovered
+attacks. Promotion has exactly queen, rook, bishop, and knight choices.
+
+For orthodox castling, require rights, king/rook on their home squares, empty
+intervening squares, and a safe king start, transit, and destination. Rook squares
+need not be unattacked. Check transit with appropriate occupancy; testing only
+the final king square is insufficient. Chess960 is outside the initial scope.
+
+## Tests and correctness gates
+
+Use executable-based tests with CTest. Replace assertion-only test checks with
+explicit failure checks that remain active in Release. Failure messages should
+identify the position, move, expected result, and observed result.
+
+Test FEN success/failure and failure preservation; board invariants; all movement
+and attack types; exact make/undo for both colors; nested sequences; captures;
+all promotions; castling; en passant; pins; check evasions; mate and stalemate.
+Compare full state, not only piece counts. Verify Perft and search preserve input.
+
+Starting-position legal Perft references are 20, 400, 8902, and 197281 at depths
+1–4. Add multiple known positions/depths for special rules and record the source
+of each fixture. Add divide and compare branches when counts differ. Perft
+counts legal move paths; do not apply repetition or move-count draw adjudication
+to ordinary Perft. Optional differential testing may use another engine as a
+development tool without making it a runtime dependency.
+
+Add opt-in AddressSanitizer/UndefinedBehaviorSanitizer builds for supported
+compilers. Verify Debug and Release once test checks work in both. Keep production
+code free of undefined behavior; use profiling and reproducible benchmarks before
+optimizing. Do not rewrite to bitboards merely because array Perft compiles.
+
+## Search and game outcomes
+
+Begin only after the legal-move and Perft foundation passes. Use a consistent
+side-to-move evaluation and test sign changes. Implement reference negamax,
+then compare alpha-beta against it on small positions.
+
+Handle no legal moves before static leaf evaluation: checkmate when in check,
+stalemate otherwise. Keep mate scores outside the material range and use ply
+distance to prefer quicker mates and delay losses. Never evaluate kings as
+ordinary capturable material.
+
+Quiescence may start with captures and promotions, but when in check it must
+search legal evasions and must not use stand-pat. Test recaptures and promotions.
+Future time-limited search returns the last completed iteration, with a legal
+fallback move when interrupted before completing one. Inject a stop/deadline
+mechanism rather than hiding protocol logic in recursion.
+
+Draw adjudication needs an explicit policy: repetition history, claimable draws,
+automatic move-count draws, and dead positions are distinct. Track these before
+claiming full game-rule support. Account for history/halfmove-sensitive results
+when caching scores; a placement hash alone cannot encode every draw condition.
+
+Use fixed-seed Zobrist keys. Specify the en passant treatment for repetition
+identity (only legally available captures affect it) separately from a safe
+transposition-table key policy. Test full recomputation against incremental keys.
+Store TT depth, bound type, best move, and score; normalize mate-distance scores
+across plies and verify collisions/entry replacement do not break correctness.
+
+## C++ style and ownership
+
+Prefer Rule of Zero classes whose members manage their own resources. Pass small
+values by value, larger read-only objects by const reference, and mutable boards
+by reference. References and spans borrow; never return them to expired storage.
+Use `std::optional` for absence, `std::chrono::steady_clock` for elapsed time,
+and `std::unique_ptr` only for actual dynamic ownership. Avoid owning raw pointers,
+mutable globals, C-style casts, unnecessary macros, and premature templates.
+Keep public headers self-contained. Explain representation tradeoffs when changing
+an API or layout. A clearer loop is preferable to an opaque ranges expression.
+
+## Further reading
+
+- [FIDE Laws of Chess](https://handbook.fide.com/chapter/E012023): movement,
+  attacks, check, castling, and game outcomes.
+- [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines):
+  value semantics, ownership, RAII, and Rule of Zero.
+
+For the ordered learning plan and future advanced features, maintain
+[docs/roadmap.md](docs/roadmap.md) rather than duplicating a second roadmap here.
