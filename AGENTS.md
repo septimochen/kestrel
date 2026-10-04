@@ -7,9 +7,10 @@ Prioritize correctness, readability, testability, and incremental complexity,
 then measure performance before optimizing. Preserve deterministic results for
 fixed positions, search limits, and configuration.
 
-Use C++20, CMake 3.20+, Clang or GCC, and the standard library. No external
-runtime or test library is required initially. Do not raise the language standard
-silently; `std::expected` is C++23 and is not available under this baseline.
+Use C++23 by default, CMake 3.30+, Clang or GCC, and the standard library. No external
+runtime or test library is required initially. C++26 is available as an opt-in experiment with `CXX_STANDARD=26`. Use verified
+features that improve clarity; language-mode acceptance is not full conformance.
+See [docs/modern-cpp.md](docs/modern-cpp.md) for local feature probes.
 
 ## Workflow
 
@@ -42,8 +43,8 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Current tests use `assert`, so Debug is necessary until test checks run under
-`NDEBUG` too. The existing depth-three failure is tracked in the roadmap.
+Tests use explicit checks that also run under `NDEBUG`. Starting Perft depths
+0–3 and exact state restoration pass; legal filtering is still pending.
 
 ## Learning approach
 

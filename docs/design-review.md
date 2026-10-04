@@ -3,12 +3,11 @@
 ## Assessment
 
 The array board, value-based moves, CMake library/CLI split, and incremental
-correctness-first approach are a good foundation. Keep them. The most urgent
-implementation work is complete undo; the current shallow Perft failure means
-search and representation optimization should wait.
+correctness-first approach are a good foundation. Keep them. The initial review identified undo as the urgent repair. It is now tested and
+starting Perft depths 0–3 pass; attack detection and legal generation are next.
 
-This review changes documentation and contributor guidance only. Items below
-that require engine changes remain unchecked in [roadmap.md](roadmap.md).
+This page records the initial design review; implementation progress is tracked
+in [roadmap.md](roadmap.md) and [bootstrap-review.md](bootstrap-review.md).
 
 ## Improvements adopted in the design guidance
 
@@ -25,7 +24,7 @@ that require engine changes remain unchecked in [roadmap.md](roadmap.md).
 | Capture-only quiescence guidance lacked check handling | Search evasions in check and prohibit stand-pat there | Connects tactical search to legal chess rules |
 | Draw history and hashing semantics were missing | Separate position/history, repetition identity, and TT policy | Prevents assuming all equal boards have equal search context |
 | C++ concepts were a broad list | Attach concepts and short explanations to each milestone | Creates exercises with a natural reason to use each feature |
-| `std::expected` was suggested without a standard constraint | Retain C++20 and use bool/error structs initially | Keeps examples compatible with the actual build |
+| `std::expected` was suggested without a standard constraint | Probe compiler support; use C++23 expected for parsing errors | Keeps examples compatible with the actual build |
 
 ## Implementation tradeoffs to retain
 

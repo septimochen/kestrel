@@ -3,7 +3,8 @@
 ## Build and run
 
 The Makefile wraps the existing CMake build without adding library dependencies.
-Its default build type is Debug so the current assertion-based tests execute.
+Its default build type is Debug and language standard is C++23. Tests use explicit
+checks that remain active in Release.
 
 | Command | Purpose |
 | --- | --- |
@@ -25,9 +26,10 @@ committing, since formatting the whole tree can change unrelated code.
 
 ## Existing validation
 
-CTest registers one executable as `kestrel_perft`. It asserts starting-position
-counts of 20, 400, and 8902 at depths 1, 2, and 3. Run checks in Debug: builds that
-define `NDEBUG`, including typical Release builds, disable these assertions.
+CTest registers Perft, board-state, and invalid-CLI tests. Perft verifies starting
+counts of 1, 20, 400, and 8902 at depths 0–3 plus full board preservation. Board
+tests cover nested captures, special moves, rights, clocks, and FEN errors for
+both colors. All checks run under `NDEBUG` too.
 
 ```sh
 make check
@@ -37,14 +39,21 @@ make check
 ./build/kestrel perft 3
 ```
 
-The reference outputs are `1`, `20`, `400`, and `8902`. Current fresh runs
-produce `1`, `20`, `400`, and `3735`: depth three fails. `make check` also fails
-at its depth-three assertion. This is an existing engine defect, exposed by
-Debug validation; the documentation update does not change engine behavior.
-The tests cover neither FEN validation nor complete state restoration, legal
-moves, special moves, or search. Keep this coverage limit explicit when reporting
-results. Depth four's legal reference count is 197281, but it is not a passing
-requirement of the current bootstrap.
+These commands produce `1`, `20`, `400`, and `8902`. Legal move filtering,
+attack detection, special-move generation, and search remain unimplemented.
+Depth four's legal reference count is 197281; it is not currently a passing
+bootstrap requirement.
+
+Additional verified configurations:
+
+```sh
+make check BUILD_DIR=build-release BUILD_TYPE=Release
+make check BUILD_DIR=build-sanitize SANITIZERS=ON
+make check BUILD_DIR=build-cpp26 CXX_STANDARD=26 CPP_EXPERIMENTS=ON
+```
+
+AddressSanitizer and UndefinedBehaviorSanitizer are opt-in for Clang/GCC.
+See [modern-cpp.md](modern-cpp.md) for supported feature examples.
 
 ## Adding engine features
 

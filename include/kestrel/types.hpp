@@ -27,6 +27,8 @@ struct Piece {
     PieceType type = PieceType::None;
     Color color = Color::White;
 
+    constexpr bool operator==(const Piece&) const = default;
+
     constexpr bool empty() const {
         return type == PieceType::None;
     }

@@ -1,36 +1,37 @@
 # Roadmap and learning checklist
 
-Kestrel is at Stage 0. A fresh depth-three Perft run returns 3735 instead of
-8902, and Debug CTest fails. Checkboxes track verified work; a checked item does
+Kestrel has a C++23 bootstrap and tested reversible board state. Starting Perft
+depths 0–3 pass in Debug, Release, C++26 mode, and sanitizer builds. Checkboxes track verified work; a checked item does
 not imply its entire stage is complete. [AGENTS.md](../AGENTS.md) contains the
 contributor rules; [architecture.md](architecture.md) describes current behavior.
 
 ## Next work, in order
 
-- [ ] Reproduce depth-three failure and add a focused capture make/undo regression.
-- [ ] Restore original pieces and captured squares; test quiet moves, captures,
+- [x] Reproduce depth-three failure and add a focused capture make/undo regression.
+- [x] Restore original pieces and captured squares; test quiet moves, captures,
   promotions, and nested make/undo for both colors.
-- [ ] Re-run starting Perft depths 1–3 and verify the entire input board is unchanged.
-- [ ] Complete special-move state, castling rights, and clocks, with round-trip tests.
-- [ ] Make FEN loading strict and transactional, then add dedicated attack detection.
+- [x] Re-run starting Perft depths 1–3 and verify the entire input board is unchanged.
+- [x] Complete special-move state, castling rights, and clocks, with round-trip tests.
+- [x] Make FEN loading structurally strict and transactional.
+- [ ] Add dedicated attack detection.
 - [ ] Implement legal filtering and special-move generation; validate deeper Perft.
 
-Investigate the state-loss defect first. A correct undo implementation may fix
-this shallow mismatch, but passing it still does not prove legal generation.
+The capture-restoration defect is fixed. Passing shallow counts still does not
+prove legal generation; attack detection is next.
 
 ## Stage 0 — Bootstrap and useful diagnostics
 
 Learn C++ translation units, headers, linking, build configurations, and chess
 coordinates. Explain why a legal move count differs from a movement-only count.
 
-- [x] Establish C++20/CMake library, CLI, and CTest executable.
+- [x] Establish C++23/CMake library, CLI, and CTest executable.
 - [x] Add array board, readable pieces/moves, and ordinary pseudo-legal generation.
 - [x] Document implemented behavior, known limits, and build commands.
-- [ ] Replace `assert` test checks with checks that execute under `NDEBUG`.
-- [ ] Make test failures identify the fixture and expected/observed result.
-- [ ] Validate CLI arguments and reject negative/non-integer/overflowing depth.
-- [ ] Fix existing compiler warnings without unrelated formatting changes.
-- [ ] Add opt-in sanitizer configuration and document Debug/Release checks.
+- [x] Replace `assert` test checks with checks that execute under `NDEBUG`.
+- [x] Make test failures identify the fixture and expected/observed result.
+- [x] Validate CLI arguments and reject negative/non-integer/overflowing depth.
+- [x] Fix existing compiler warnings without unrelated formatting changes.
+- [x] Add opt-in sanitizer configuration and document Debug/Release checks.
 
 Gate: test failures remain visible in every configuration; invalid input exits
 cleanly. The Perft foundation is completed in Stages 1–3.
@@ -41,16 +42,16 @@ Learn value semantics, structs/classes, const references, enums, integer bounds,
 and transactional updates. Explain irreversible chess metadata and why undo
 must save information instead of guessing it.
 
-- [ ] Define full-position comparison for tests (all squares and metadata).
-- [ ] Save original moving piece, captured piece/square, and prior metadata.
-- [ ] Restore ordinary captures, all promotion choices, and promotion captures.
-- [ ] Restore en passant and both castling rook relocations exactly.
-- [ ] Update castling rights on king/rook moves and home-rook captures.
-- [ ] Track halfmove/fullmove counters and restore them on undo.
-- [ ] Test each move type for White and Black plus nested move sequences.
-- [ ] Parse all six FEN fields, reject malformed input, and preserve state on failure.
+- [x] Define full-position comparison for tests (all squares and metadata).
+- [x] Save original moving piece, captured piece/square, and prior metadata.
+- [x] Restore ordinary captures, all promotion choices, and promotion captures.
+- [x] Restore en passant and both castling rook relocations exactly.
+- [x] Update castling rights on king/rook moves and home-rook captures.
+- [x] Track halfmove/fullmove counters and restore them on undo.
+- [x] Test each move type for White and Black plus nested move sequences.
+- [x] Parse all six FEN fields, reject malformed input, and preserve state on failure.
 - [ ] Add FEN serialization and round-trip tests to make fixtures inspectable.
-- [ ] Confirm starting depths 1–3 and state preservation after each traversal.
+- [x] Confirm starting depths 1–3 and state preservation after each traversal.
 
 Gate: every tested make/undo sequence restores exactly; FEN errors leave the
 previous board intact. Serialization is planned, not currently implemented.

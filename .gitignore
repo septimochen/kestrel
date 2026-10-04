@@ -17,3 +17,5 @@
 !/docs/
 !/docs/**/
 !/docs/**/*.md
+!/examples/
+!/examples/*.cpp

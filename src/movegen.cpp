@@ -13,7 +13,7 @@ void addMove(std::vector<Move>& moves, Square from, Square to,
     const Piece& target = board.pieceAt(to);
     const Piece& moving = board.pieceAt(from);
 
-    if (!target.empty() && target.color == moving.color) {
+    if (target.type == PieceType::King || (!target.empty() && target.color == moving.color)) {
         return;
     }
 
@@ -30,10 +30,10 @@ void addMove(std::vector<Move>& moves, Square from, Square to,
 void generateKnightMoves(const Board& board, Square from,
                          std::vector<Move>& moves) {
     static constexpr int offsets[] = {
-        {1}, {2}, {2}, {1}, {-1}, {-2}, {-2}, {-1}
+        1, 2, 2, 1, -1, -2, -2, -1
     };
     static constexpr int rankOffsets[] = {
-        {2}, {1}, {-1}, {-2}, {-2}, {-1}, {1}, {2}
+        2, 1, -1, -2, -2, -1, 1, 2
     };
 
     int file = fileOf(from);
