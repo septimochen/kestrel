@@ -1,56 +1,62 @@
 # Kestrel
 
-A Chess Engine Built by Modern C++
+Kestrel is an educational chess engine written in C++20. It starts with a readable
+64-square board and adds complexity only after correctness is established.
+There are no external library dependencies.
 
-## Current milestone
+## Quick start
 
-- Board representation using a simple 64-square array
-- FEN parsing
-- Move representation
-- Pseudo-legal move generation
-- Basic `makeMove`
-- Perft
-- Minimal test suite
-- Placeholder search interface
+Requirements: CMake 3.20 or newer and a C++20 compiler (Clang or GCC).
+Make is optional. On macOS, the Xcode Command Line Tools provide Clang.
 
-## Build
+From the repository root:
 
-```bash
-cmake -S . -B build
+```sh
+make check
+make run
+make perft DEPTH=3
+```
+
+Or use CMake directly:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ctest --test-dir build --output-on-failure
-```
-
-Run:
-
-```bash
 ./build/kestrel
-```
-
-Perft:
-
-```bash
-./build/kestrel perft 1
-./build/kestrel perft 2
 ./build/kestrel perft 3
 ```
 
-## Roadmap
+The default invocation prints the version and the starting position's 20
+pseudo-legal moves. `perft` prints a node count from the starting position.
+Use a nonnegative integer depth; depth zero returns `1`. Negative depths and
+invalid arguments are not handled safely yet. The CLI does not accept FEN,
+play interactive games, or implement UCI.
 
-1. Correct legal move generation
-2. Make/undo with complete state restoration
-3. Perft through castling, en passant, and promotion
-4. Negamax
-5. Alpha-beta pruning
-6. Evaluation
-7. Iterative deepening
-8. Quiescence search
-9. Move ordering
-10. Zobrist hashing and transposition tables
-11. Bitboards
-12. UCI
-13. Parallel search
-14. Stronger evaluation / NNUE
+## Current implementation
 
-Kestrel intentionally starts with a readable board representation.
-Performance-oriented representations will come later.
+| Component | Status |
+| --- | --- |
+| Board | 64-square array, side to move, castling rights, en passant target |
+| FEN | Reads four fields; ignores clocks and trailing fields; validation is incomplete |
+| Move generation | Ordinary movement, captures, and four promotion choices for both colors |
+| Special moves | Make/undo has special-move branches; generation omits castling and en passant |
+| Make/undo | Partial restoration; captures and promotions are not fully reversible |
+| Perft | Traverses pseudo-legal moves; starting depths 1–3 have assertions; depth 3 currently fails |
+| Search | Returns the first pseudo-legal move; ignores depth |
+
+Attack detection, check detection, and legal move filtering are not implemented.
+Depths 1 and 2 return 20 and 400; a fresh depth-three run currently returns
+3735 rather than the legal reference count 8902. `make check` currently fails
+at the depth-three assertion. Shallow starting-position counts do not establish
+a correct chess engine. Capture restoration can also corrupt the board during traversal.
+
+## Documentation
+
+- [Architecture and API](docs/architecture.md): source map, board layout, data flow, and API contracts.
+- [Development guide](docs/development.md): commands, tests, debugging, and contribution workflow.
+- [Roadmap](docs/roadmap.md): milestones and their correctness gates.
+- [AGENTS.md](AGENTS.md): detailed project design and coding rules.
+
+The immediate next milestone is complete make/undo restoration, followed by
+attack detection, legal move generation, and broader Perft validation.
